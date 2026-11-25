@@ -13,5 +13,5 @@
 *.woff2 binary
 *.pdf binary
 
-# lock 文件在 diff 中折叠
-package-lock.json linguist-generated=true -diff
+# lock 文件在 GitHub 语言统计中折叠（保留 diff 可读性）
+package-lock.json linguist-generated=true
