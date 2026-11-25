@@ -1,0 +1,398 @@
+@import "tailwindcss";
+
+/* 让 dark: 变体跟随 html.dark 类，而不是系统偏好 */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ============ 语义化配色：默认浅色，html.dark 切换深色 ============
+   首屏由 layout 内联脚本按「localStorage 记忆 → 系统偏好」决定是否加 .dark，
+   因此这里的深色只写一份，不依赖媒体查询。 */
+:root {
+  color-scheme: light;
+  --canvas: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #f1f3f6;
+  --border: #e5e8ee;
+  --ink: #14181f;
+  --ink-soft: #3d4552;
+  --muted: #6b7484;
+  --brand: #2f5fe0;
+  --brand-soft: #eaf0ff;
+  --brand-ink: #ffffff;
+  --accent: #0e9f8e;
+  --danger: #d93a3a;
+  --ring: #2f5fe055;
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 8px 24px -12px rgba(16, 24, 40, 0.12);
+}
+
+:root.dark {
+  color-scheme: dark;
+  --canvas: #0b0e13;
+  --surface: #12161d;
+  --surface-2: #1a1f28;
+  --border: #252c37;
+  --ink: #eef1f6;
+  --ink-soft: #c3cad6;
+  --muted: #8d97a6;
+  --brand: #7aa2ff;
+  --brand-soft: #1a2438;
+  --brand-ink: #0b0e13;
+  --accent: #46c9b8;
+  --danger: #ff7b7b;
+  --ring: #7aa2ff44;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 28px -16px rgba(0, 0, 0, 0.8);
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-muted: var(--muted);
+  --color-brand: var(--brand);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-ink: var(--brand-ink);
+  --color-accent: var(--accent);
+  --color-danger: var(--danger);
+  --color-ring: var(--ring);
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --font-serif: "Songti SC", "Noto Serif SC", "Source Han Serif SC", "SimSun", Georgia,
+    "Times New Roman", serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+    background-color: var(--canvas);
+  }
+
+  body {
+    background-color: var(--canvas);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: var(--brand);
+    color: var(--brand-ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+  }
+
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+
+  /* 移动端点击不出现灰块，滚动更跟手 */
+  a,
+  button {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* 主题切换的那一两帧里关掉过渡：否则背景是瞬间变的，而所有带 transition 的
+     文字、按钮、输入框要追 150ms，看起来像控件慢了半拍。见 layout 的 themeScript。 */
+  html.theme-switching,
+  html.theme-switching *,
+  html.theme-switching *::before,
+  html.theme-switching *::after {
+    transition: none !important;
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes sheetUp {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+/* 首页留白页的底部水波：整条带子横向平移一份宽度，首尾同高所以无缝 */
+@keyframes waveDrift {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-50%, 0, 0); }
+}
+
+/* ============ 文章正文排版（不引入 typography 插件） ============ */
+.prose-article {
+  color: var(--ink-soft);
+  font-size: 0.9688rem;
+  line-height: 1.75;
+  word-break: break-word;
+}
+.prose-article > * + * {
+  margin-top: 0.9em;
+}
+.prose-article h1,
+.prose-article h2,
+.prose-article h3,
+.prose-article h4 {
+  color: var(--ink);
+  font-weight: 650;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+}
+.prose-article h1 { font-size: 1.5rem; }
+.prose-article h2 {
+  font-size: 1.25rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--border);
+}
+.prose-article h3 { font-size: 1.0625rem; }
+.prose-article p { margin-top: 0.9em; }
+.prose-article a {
+  color: var(--brand);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+.prose-article strong { color: var(--ink); font-weight: 650; }
+.prose-article ul,
+.prose-article ol {
+  padding-left: 1.3em;
+  margin-top: 0.75em;
+}
+.prose-article ul { list-style: disc; }
+.prose-article ol { list-style: decimal; }
+.prose-article li { margin-top: 0.25em; }
+.prose-article li::marker { color: var(--muted); }
+.prose-article blockquote {
+  border-left: 3px solid var(--brand);
+  background: var(--surface-2);
+  border-radius: 0 0.75rem 0.75rem 0;
+  padding: 0.65rem 0.95rem;
+  color: var(--ink-soft);
+}
+.prose-article blockquote p { margin: 0; }
+.prose-article code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 0.375rem;
+  padding: 0.12em 0.38em;
+}
+.prose-article pre {
+  background: #10151d;
+  color: #e6edf3;
+  border-radius: 0.75rem;
+  padding: 0.8rem 1rem;
+  overflow-x: auto;
+  font-size: 0.8125rem;
+  line-height: 1.65;
+}
+.prose-article pre code {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+}
+.prose-article img {
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+  max-width: 100%;
+  height: auto;
+}
+.prose-article video {
+  width: 100%;
+  border-radius: 0.9rem;
+  background: #000;
+  display: block;
+}
+.prose-article audio {
+  width: 100%;
+  margin: 0.5rem 0;
+}
+.prose-article iframe {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  border: 0;
+  border-radius: 0.9rem;
+}
+.prose-article hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 1.7em 0;
+}
+.prose-article table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+  display: block;
+  overflow-x: auto;
+}
+.prose-article th,
+.prose-article td {
+  border: 1px solid var(--border);
+  padding: 0.55rem 0.75rem;
+  text-align: left;
+}
+.prose-article th { background: var(--surface-2); color: var(--ink); }
+.prose-article figure figcaption {
+  font-size: 0.82rem;
+  color: var(--muted);
+  text-align: center;
+  margin-top: 0.5rem;
+}
+
+/* ============ Tiptap 编辑器 ============ */
+.tiptap {
+  position: relative;
+  min-height: 19rem;
+  outline: none;
+  padding: 1rem;
+}
+.tiptap > * + * { margin-top: 0.75em; }
+.tiptap h1 { font-size: 1.55rem; font-weight: 650; margin-top: 1.3em; }
+.tiptap h2 { font-size: 1.25rem; font-weight: 650; margin-top: 1.15em; }
+.tiptap h3 { font-size: 1.0625rem; font-weight: 650; margin-top: 1em; }
+.tiptap p { line-height: 1.7; }
+.tiptap ul { list-style: disc; padding-left: 1.4em; }
+.tiptap ol { list-style: decimal; padding-left: 1.4em; }
+.tiptap blockquote {
+  border-left: 3px solid var(--brand);
+  padding-left: 1rem;
+  color: var(--muted);
+}
+.tiptap pre {
+  background: #10151d;
+  color: #e6edf3;
+  border-radius: 0.75rem;
+  padding: 0.9rem 1rem;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+.tiptap code {
+  font-family: var(--font-mono);
+  background: var(--surface-2);
+  border-radius: 0.3rem;
+  padding: 0.1em 0.35em;
+  font-size: 0.88em;
+}
+.tiptap pre code { background: transparent; padding: 0; }
+.tiptap img {
+  border-radius: 0.75rem;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--border);
+}
+.tiptap video {
+  width: 100%;
+  border-radius: 0.75rem;
+  background: #000;
+}
+.tiptap audio { width: 100%; }
+.tiptap hr { border-top: 1px solid var(--border); margin: 1.6em 0; }
+.tiptap a { color: var(--brand); text-decoration: underline; }
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--muted);
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  right: 1rem;
+  pointer-events: none;
+  line-height: 1.7;
+}
+.tiptap video.ProseMirror-selectednode,
+.tiptap audio.ProseMirror-selectednode,
+.tiptap img.ProseMirror-selectednode {
+  outline: 3px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* Markdown 源码模式下，编辑器工具栏里除「模式切换」之外的按钮全部置灰且不可点 */
+.is-md-mode > :not([data-mode-toggle]) {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* ============ 代码块横向滚动条 ============
+   代码块底色是 #10151d，系统默认滚动条（浅灰轨道 + 两端箭头）落在上面很突兀。
+   这里统一成：透明轨道 + 细滑块 + 无箭头，Firefox 用 scrollbar-* 标准属性。 */
+.prose-article pre,
+.tiptap pre {
+  overscroll-behavior-x: contain;
+}
+
+/* 只给 Firefox 用标准属性；Chrome / Edge 一旦读到 scrollbar-width 就会忽略
+   下面的 ::-webkit-scrollbar 规则，退回 overlay 细条，样式不可控 */
+@supports (-moz-appearance: none) {
+  .prose-article pre,
+  .tiptap pre {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  }
+}
+.prose-article pre::-webkit-scrollbar,
+.tiptap pre::-webkit-scrollbar {
+  height: 8px;
+}
+.prose-article pre::-webkit-scrollbar-track,
+.tiptap pre::-webkit-scrollbar-track {
+  background: transparent;
+}
+.prose-article pre::-webkit-scrollbar-thumb,
+.tiptap pre::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  /* 两侧留一点边，滑块不会顶着代码块圆角 */
+  border-left: 2px solid transparent;
+  border-right: 2px solid transparent;
+  background-clip: padding-box;
+}
+.prose-article pre::-webkit-scrollbar-thumb:hover,
+.tiptap pre::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.32);
+  background-clip: padding-box;
+}
+/* 去掉 Windows 经典滚动条两端的箭头按钮和右下角方块 */
+.prose-article pre::-webkit-scrollbar-button,
+.tiptap pre::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+.prose-article pre::-webkit-scrollbar-corner,
+.tiptap pre::-webkit-scrollbar-corner {
+  background: transparent;
+}
