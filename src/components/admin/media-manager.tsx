@@ -27,7 +27,28 @@ const FILTERS: Array<{ key: 'ALL' | MediaKind; label: string }> = [
   { key: 'FILE', label: '附件' },
 ];
 
-export function MediaManager({ media }: { media: MediaRow[] }) {
+export type MediaUsage = {
+  used: number;
+  count: number;
+  quota: number;
+  byType: Array<{ type: MediaKind; size: number; count: number }>;
+};
+
+const TYPE_LABELS: Record<MediaKind, string> = {
+  IMAGE: '图片',
+  VIDEO: '视频',
+  AUDIO: '音频',
+  FILE: '附件',
+};
+
+/** 用量进度条与提示的配色，按占用比例分级 */
+function usageTone(ratio: number) {
+  if (ratio >= 0.9) return { bar: 'bg-danger', text: 'text-danger', note: 'danger' as const };
+  if (ratio >= 0.7) return { bar: 'bg-amber-500', text: 'text-amber-600 dark:text-amber-400', note: 'warn' as const };
+  return { bar: 'bg-brand', text: 'text-muted', note: 'ok' as const };
+}
+
+export function MediaManager({ media, usage }: { media: MediaRow[]; usage: MediaUsage }) {
   const { push } = useToast();
   const router = useRouter();
   const [filter, setFilter] = React.useState<'ALL' | MediaKind>('ALL');
@@ -38,15 +59,29 @@ export function MediaManager({ media }: { media: MediaRow[] }) {
 
   const list = filter === 'ALL' ? media : media.filter((m) => m.type === filter);
 
+  const ratio = usage.quota > 0 ? Math.min(1, usage.used / usage.quota) : 0;
+  const tone = usageTone(ratio);
+  const percent = (ratio * 100).toFixed(ratio < 0.1 ? 1 : 0);
+
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
     setUploading(true);
     setProgress(0);
     try {
+      let compressedCount = 0;
+      let savedBytes = 0;
       for (const file of Array.from(files)) {
-        await uploadAndRegister(file, setProgress);
+        const result = await uploadAndRegister(file, setProgress);
+        if (result.compressed) {
+          compressedCount += 1;
+          savedBytes += result.originalSize - result.size;
+        }
       }
-      push(`已上传 ${files.length} 个文件`);
+      push(
+        compressedCount > 0
+          ? `已上传 ${files.length} 个文件，压缩 ${compressedCount} 张，节省 ${formatSize(savedBytes)}`
+          : `已上传 ${files.length} 个文件`,
+      );
       router.refresh();
     } catch (error) {
       push(error instanceof Error ? error.message : '上传失败，请检查 BLOB_READ_WRITE_TOKEN', 'error');
@@ -90,6 +125,41 @@ export function MediaManager({ media }: { media: MediaRow[] }) {
           onChange={(e) => handleFiles(e.target.files)}
         />
       </div>
+
+      <section className="rounded-xl border border-border bg-surface p-3.5 shadow-[var(--shadow-card)]">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h3 className="text-[13px] font-semibold text-ink">存储用量</h3>
+          <span className={cn('text-[12px] tabular-nums', tone.text)}>
+            {formatSize(usage.used)} / {formatSize(usage.quota)} · {percent}%
+          </span>
+        </div>
+
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2">
+          <div
+            className={cn('h-full rounded-full transition-all', tone.bar)}
+            style={{ width: `${ratio > 0 ? Math.max(ratio * 100, 1) : 0}%` }}
+          />
+        </div>
+
+        <p className="mt-2 text-[11px] text-muted">
+          共 {usage.count} 个文件
+          {[...usage.byType]
+            .sort((a, b) => b.size - a.size)
+            .map((item) => ` · ${TYPE_LABELS[item.type]} ${formatSize(item.size)}`)
+            .join('')}
+        </p>
+
+        {tone.note === 'danger' && (
+          <p className="mt-2 rounded-lg bg-danger/10 px-2.5 py-2 text-[11px] leading-relaxed text-danger">
+            已接近免费额度上限。超出后 Vercel Blob 将被暂停 30 天，站内图片全部无法访问——请立即清理不再使用的文件，或升级 Pro。
+          </p>
+        )}
+        {tone.note === 'warn' && (
+          <p className="mt-2 rounded-lg bg-amber-500/10 px-2.5 py-2 text-[11px] leading-relaxed text-amber-700 dark:text-amber-400">
+            免费额度已用掉七成以上。建议清理不再使用的文件；新上传的图片会自动压缩为 WebP，可再用 BLOB_QUOTA_GB 调整这里的额度基准。
+          </p>
+        )}
+      </section>
 
       <div
         onDragOver={(e) => {

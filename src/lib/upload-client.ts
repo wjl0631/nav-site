@@ -2,10 +2,21 @@
 
 import { upload } from '@vercel/blob/client';
 import { saveMediaAction } from '@/actions/media';
+import { compressImage } from './image-compress';
 
 export type MediaKind = 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE';
 
-export type UploadedMedia = { url: string; type: MediaKind; filename: string; size: number };
+export type UploadedMedia = {
+  url: string;
+  type: MediaKind;
+  filename: string;
+  /** 实际入库体积（压缩后） */
+  size: number;
+  /** 原始体积；未压缩时与 size 相同 */
+  originalSize: number;
+  /** 是否发生了压缩 */
+  compressed: boolean;
+};
 
 function kindOf(file: File): MediaKind {
   if (file.type.startsWith('video/')) return 'VIDEO';
@@ -47,15 +58,27 @@ export async function uploadAndRegister(
   onProgress?: (percentage: number) => void,
 ): Promise<UploadedMedia> {
   const mode = await storageMode();
-  const type = kindOf(file);
 
   if (mode === 'disabled') {
     throw new Error(NO_STORAGE_MESSAGE);
   }
 
+  // 图片先压缩再上传：直接决定 Blob 存储与流量的消耗速度
+  const { file: target, originalSize, compressed } = await compressImage(file);
+  const type = kindOf(target);
+
+  const done = (url: string, savedType: MediaKind): UploadedMedia => ({
+    url,
+    type: savedType,
+    filename: target.name,
+    size: target.size,
+    originalSize,
+    compressed,
+  });
+
   if (mode === 'blob') {
-    const pathname = `${type.toLowerCase()}/${Date.now()}-${safeName(file.name)}`;
-    const blob = await upload(pathname, file, {
+    const pathname = `${type.toLowerCase()}/${Date.now()}-${safeName(target.name)}`;
+    const blob = await upload(pathname, target, {
       access: 'public',
       handleUploadUrl: '/api/upload',
       onUploadProgress: (event) => onProgress?.(Math.round(event.percentage)),
@@ -64,16 +87,16 @@ export async function uploadAndRegister(
     await saveMediaAction({
       url: blob.url,
       type,
-      filename: file.name,
-      mimeType: file.type || 'application/octet-stream',
-      size: file.size,
+      filename: target.name,
+      mimeType: target.type || 'application/octet-stream',
+      size: target.size,
     });
 
-    return { url: blob.url, type, filename: file.name, size: file.size };
+    return done(blob.url, type);
   }
 
   const body = new FormData();
-  body.append('file', file);
+  body.append('file', target);
   onProgress?.(30);
   const res = await fetch('/api/upload/local', { method: 'POST', body });
   const data = (await res.json()) as { url?: string; type?: MediaKind; error?: string };
@@ -85,17 +108,18 @@ export async function uploadAndRegister(
   await saveMediaAction({
     url: data.url,
     type: data.type ?? type,
-    filename: file.name,
-    mimeType: file.type || 'application/octet-stream',
-    size: file.size,
+    filename: target.name,
+    mimeType: target.type || 'application/octet-stream',
+    size: target.size,
   });
 
-  return { url: data.url, type: data.type ?? type, filename: file.name, size: file.size };
+  return done(data.url, data.type ?? type);
 }
 
 export function formatSize(bytes: number) {
-  if (!bytes) return '—';
+  if (!bytes || bytes < 0) return '0 B';
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  if (bytes < 1024 ** 3) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
 }
