@@ -68,6 +68,30 @@ function postForm(url: string, body: FormData, onProgress?: (percentage: number)
 }
 
 /**
+ * 把直传失败翻译成能指导操作的话。
+ *
+ * 之前的写法一律断言「被跨域拦截」，但真实失败原因有好几种
+ * （类型不在白名单、超出体积上限、临时网络错误、确实跨域），
+ * 猜错原因比不给提示更糟——用户会照着错误的方向去压缩文件。
+ */
+function describeUploadError(error: unknown, file: File): string {
+  const name = error instanceof Error ? error.name : '';
+  const message = error instanceof Error ? error.message : String(error);
+
+  if (/ContentTypeNotAllowed/i.test(name) || /is not allowed/i.test(message)) {
+    const type = file.type || file.name.split('.').pop() || '未知';
+    return `不支持这种文件类型（${type}），可上传图片、音视频、PDF、Office 文档或 zip/rar/7z 压缩包`;
+  }
+  if (/FileTooLarge/i.test(name) || /too large/i.test(message)) {
+    return `文件超过单次上传上限（100MB），请压缩后再传`;
+  }
+  if (/CORS|cross-origin|Failed to fetch|NetworkError|Load failed|ERR_FAILED/i.test(message)) {
+    return `浏览器直传被网络策略拦截，可重试一次；仍失败请把文件压到 4MB 以内（走服务器中转），或改用外链地址`;
+  }
+  return `上传失败：${message.slice(0, 140)}`;
+}
+
+/**
  * 上传媒体并登记到媒体中心。
  * - Blob 模式：≤4MB 经服务端中转（绕开浏览器直传的 CORS 限制）；更大文件走浏览器直传
  * - 本地模式：POST /api/upload/local 写入 public/uploads（仅开发环境可用）
@@ -139,11 +163,8 @@ export async function uploadAndRegister(
         },
       });
       blobUrl = blob.url;
-    } catch {
-      throw new Error(
-        `文件 ${(target.size / 1024 / 1024).toFixed(1)}MB 超过服务器中转上限（4MB），` +
-          '浏览器直传又被平台跨域策略拦截。请压缩后再传，或改用外链地址。',
-      );
+    } catch (error) {
+      throw new Error(describeUploadError(error, target));
     }
 
     onProgress?.(100);
