@@ -45,6 +45,27 @@ export function RichEditor({
   const [mode, setMode] = React.useState<'rich' | 'md'>('rich');
   const [markdown, setMarkdown] = React.useState('');
 
+  // 大文件直传的进度事件很稀疏，长时间零更新时改用计时文案，避免看起来像卡死
+  const uploadTick = React.useRef(0);
+  const uploadStart = React.useRef(0);
+  const [, forceTick] = React.useState(0);
+
+  React.useEffect(() => {
+    if (!uploading) return;
+    const timer = window.setInterval(() => forceTick((n) => n + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [uploading]);
+
+  const reportProgress = React.useCallback((value: number) => {
+    uploadTick.current = Date.now();
+    setProgress(value);
+  }, []);
+
+  const idleSeconds = uploading && uploadTick.current ? Math.round((Date.now() - uploadTick.current) / 1000) : 0;
+  const elapsedSeconds = uploading && uploadStart.current ? Math.round((Date.now() - uploadStart.current) / 1000) : 0;
+  const uploadLabel =
+    progress < 10 ? '上传中…' : idleSeconds >= 3 ? `上传中… ${elapsedSeconds}s` : `上传中 ${progress}%`;
+
   const imageInput = React.useRef<HTMLInputElement>(null);
   const videoInput = React.useRef<HTMLInputElement>(null);
   const audioInput = React.useRef<HTMLInputElement>(null);
@@ -143,8 +164,10 @@ export function RichEditor({
     setError('');
     setUploading(kind);
     setProgress(0);
+    uploadTick.current = Date.now();
+    uploadStart.current = Date.now();
     try {
-      const media = await uploadAndRegister(file, setProgress);
+      const media = await uploadAndRegister(file, reportProgress);
       if (kind === 'IMAGE') {
         editor.chain().focus().setImage({ src: media.url, alt: file.name }).run();
       } else if (kind === 'FILE') {
@@ -349,7 +372,7 @@ export function RichEditor({
 
         {uploading && (
           <span data-mode-toggle className="pl-1 text-[11px] text-brand">
-            上传中 {progress}%
+            {uploadLabel}
           </span>
         )}
       </div>
