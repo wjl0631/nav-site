@@ -3,7 +3,14 @@
 import { upload } from '@vercel/blob/client';
 import { saveMediaAction } from '@/actions/media';
 import { compressImage } from './image-compress';
-import { SERVER_UPLOAD_LIMIT, kindOf, safeName, type MediaKind } from './media-meta';
+import {
+  SERVER_UPLOAD_LIMIT,
+  extOf,
+  kindOf,
+  safeName,
+  withCanonicalType,
+  type MediaKind,
+} from './media-meta';
 
 export type { MediaKind };
 
@@ -82,12 +89,12 @@ const TYPE_HINTS: Record<string, string> = {
   avi: 'AVI 容器浏览器普遍不支持播放。请转成 MP4（H.264）后再传',
   wmv: 'WMV 格式浏览器不支持播放。请转成 MP4 后再传',
   flv: 'FLV 格式浏览器不支持播放。请转成 MP4 后再传',
+  msi: 'MSI 安装包暂未开放上传。请打包成 ZIP 后再传（浏览器下载 MSI 普遍会直接拦截）',
+  apk: 'APK 安装包暂未开放上传。请打包成 ZIP 后再传',
+  dmg: 'DMG 磁盘映像暂未开放上传。请打包成 ZIP 后再传',
+  pkg: 'PKG 安装包暂未开放上传。请打包成 ZIP 后再传',
+  jar: 'JAR 暂未开放上传。请打包成 ZIP 后再传',
 };
-
-function extOf(name: string) {
-  const m = /\.([a-z0-9]+)$/i.exec(name);
-  return m ? m[1].toLowerCase() : '';
-}
 
 /**
  * 把直传失败翻译成能指导操作的话。
@@ -136,7 +143,11 @@ export async function uploadAndRegister(
   onProgress?.(2);
 
   // 图片先压缩再上传：直接决定 Blob 存储与流量的消耗速度
-  const { file: target, originalSize, compressed } = await compressImage(file);
+  const compressedResult = await compressImage(file);
+  // exe 等类型浏览器可能不填 MIME，直传的 Content-Type 会为空而被存储端拒绝
+  const target = withCanonicalType(compressedResult.file);
+  const originalSize = compressedResult.originalSize;
+  const compressed = compressedResult.compressed;
   const type = kindOf(target);
   onProgress?.(10);
 

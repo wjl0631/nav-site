@@ -3,6 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { auth } from '@/lib/auth';
+import { resolveContentType } from '@/lib/media-meta';
 
 export const runtime = 'nodejs';
 
@@ -50,6 +51,7 @@ const MIME_EXT: Record<string, { ext: string; type: 'IMAGE' | 'VIDEO' | 'AUDIO' 
   'application/x-rar-compressed': { ext: '.rar', type: 'FILE' },
   'application/vnd.rar': { ext: '.rar', type: 'FILE' },
   'application/x-7z-compressed': { ext: '.7z', type: 'FILE' },
+  'application/x-msdownload': { ext: '.exe', type: 'FILE' },
 };
 
 /**
@@ -83,9 +85,11 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: '文件超过 100MB 限制' }, { status: 413 });
   }
 
-  const meta = MIME_EXT[file.type];
+  // 浏览器对 .exe 可能不填 MIME，按扩展名补标准类型后再查白名单
+  const contentType = resolveContentType(file.name, file.type);
+  const meta = MIME_EXT[contentType];
   if (!meta) {
-    return NextResponse.json({ error: `不支持的文件类型：${file.type || '未知'}` }, { status: 415 });
+    return NextResponse.json({ error: `不支持的文件类型：${contentType || '未知'}` }, { status: 415 });
   }
 
   const filename = `${Date.now()}-${randomUUID().slice(0, 8)}${meta.ext}`;
@@ -97,7 +101,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     url: `/uploads/${filename}`,
     type: meta.type,
     filename: file.name,
-    mimeType: file.type,
+    mimeType: contentType,
     size: file.size,
   });
 }

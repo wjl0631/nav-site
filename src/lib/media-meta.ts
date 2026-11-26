@@ -20,6 +20,45 @@ export function safeName(name: string) {
   return cleaned.slice(-60) || 'file';
 }
 
+export function extOf(name: string) {
+  const m = /\.([a-z0-9]+)$/i.exec(name);
+  return m ? m[1].toLowerCase() : '';
+}
+
+/**
+ * 浏览器识别不可靠的扩展名 → 标准 MIME。
+ *
+ * `.exe` 在部分浏览器/系统上会报空类型或 `application/octet-stream`，
+ * 而白名单是按 MIME 判定的。这里按扩展名补一个标准类型，
+ * 而不是把 `application/octet-stream` 整体放行——后者等于白名单失效，
+ * 任何未知二进制（含 .html/.bat 改名的文件）都能混进来。
+ *
+ * 只在浏览器「没给类型」或「只给了通用二进制类型」时才纠正；
+ * 已经报成其它明确类型的不动，交给白名单去拒绝（避免伪造 MIME 蒙混过关）。
+ */
+const TYPE_BY_EXT: Record<string, string> = {
+  exe: 'application/x-msdownload',
+};
+
+/** 补全后的实际内容类型，落库与白名单判定都以它为准 */
+export function resolveContentType(name: string, declared: string) {
+  const canonical = TYPE_BY_EXT[extOf(name)];
+  if (!canonical) return declared;
+  if (!declared || declared === 'application/octet-stream') return canonical;
+  return declared;
+}
+
+/**
+ * 返回带标准 Content-Type 的 File。
+ * Blob 直传时 HTTP 的 Content-Type 就取自 `file.type`，
+ * 类型为空会被存储端按 `allowedContentTypes` 拒掉，所以必须在客户端先补上。
+ */
+export function withCanonicalType(file: File): File {
+  const next = resolveContentType(file.name, file.type);
+  if (next === file.type) return file;
+  return new File([file], file.name, { type: next, lastModified: file.lastModified });
+}
+
 /**
  * 服务端中转上传的体积上限。
  *
@@ -80,4 +119,9 @@ export const ALLOWED_CONTENT_TYPES = [
   'application/x-rar-compressed',
   'application/vnd.rar',
   'application/x-7z-compressed',
+  // Windows 可执行文件。浏览器一律当下载处理、不会执行；
+  // 三种写法是各浏览器/系统对 .exe 的不同上报值，全列上才能都放行。
+  'application/x-msdownload',
+  'application/x-msdos-program',
+  'application/vnd.microsoft.portable-executable',
 ];

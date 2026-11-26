@@ -30,7 +30,7 @@ export type EditorPayload = { json: unknown; html: string };
 
 /** 附件按钮的 accept：只列常用文档，服务端另有 MIME 白名单兜底 */
 const ATTACHMENT_ACCEPT =
-  '.pdf,.zip,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.csv,.json,.epub,.rar,.7z';
+  '.pdf,.zip,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.csv,.json,.epub,.rar,.7z,.exe';
 
 export function RichEditor({
   initialContent,

@@ -120,7 +120,7 @@ export function MediaManager({ media, usage }: { media: MediaRow[]; usage: Media
           ref={inputRef}
           type="file"
           multiple
-          accept="image/*,video/*,audio/*,.flac,.opus,.aiff,.pdf,.zip,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.csv,.json,.epub,.rar,.7z"
+          accept="image/*,video/*,audio/*,.flac,.opus,.aiff,.pdf,.zip,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.csv,.json,.epub,.rar,.7z,.exe"
           className="hidden"
           onChange={(e) => handleFiles(e.target.files)}
         />

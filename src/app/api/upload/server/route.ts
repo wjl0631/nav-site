@@ -6,6 +6,7 @@ import {
   SERVER_UPLOAD_LIMIT,
   blobConfigured,
   kindOf,
+  resolveContentType,
   safeName,
 } from '@/lib/media-meta';
 
@@ -56,16 +57,23 @@ export async function POST(request: Request): Promise<NextResponse> {
       { status: 413 },
     );
   }
-  // 空类型时按扩展名兜底，避免个别浏览器不填 type
-  if (file.type && !ALLOWED_CONTENT_TYPES.includes(file.type)) {
-    return NextResponse.json({ error: `不支持的文件类型：${file.type}` }, { status: 415 });
+  // 浏览器对 .exe 可能不填 MIME，按扩展名补成标准类型；补不上再用原值判定
+  const contentType = resolveContentType(file.name, file.type);
+  if (contentType && !ALLOWED_CONTENT_TYPES.includes(contentType)) {
+    return NextResponse.json({ error: `不支持的文件类型：${contentType}` }, { status: 415 });
   }
 
   const type = kindOf(file);
   const pathname = `${type.toLowerCase()}/${Date.now()}-${safeName(file.name)}`;
 
   try {
-    const blob = await put(pathname, file, { access: 'public', addRandomSuffix: true });
+    const blob = await put(pathname, file, {
+      access: 'public',
+      addRandomSuffix: true,
+      // 显式指定：multipart 里的空类型会被存成 application/octet-stream，
+      // exe 下载时就不能按可执行文件处理了
+      ...(contentType ? { contentType } : {}),
+    });
     return NextResponse.json({ url: blob.url, type, filename: file.name, size: file.size });
   } catch (error) {
     const message = error instanceof Error ? error.message : '上传失败';
