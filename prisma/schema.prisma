@@ -57,6 +57,25 @@ model LoginLog {
   @@map("login_logs")
 }
 
+/// 线上运行时异常留痕
+///
+/// 生产环境只能看到「错误编号」，拿不到堆栈，定位全靠猜。
+/// 这里由 instrumentation.ts 的 onRequestError 落库，便于事后直接查。
+/// 只是排障设施：写入失败一律吞掉，绝不影响请求本身。
+model RuntimeError {
+  id        String   @id @default(cuid())
+  digest    String?
+  path      String?
+  method    String?
+  routePath String?
+  message   String
+  stack     String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("runtime_errors")
+}
+
 /// 导航分类
 model Category {
   id          String   @id @default(cuid())
