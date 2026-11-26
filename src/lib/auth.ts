@@ -3,6 +3,7 @@ import Credentials from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import { authConfig } from './auth.config';
 import { prisma } from './db';
+import { clientIpOf, recordLogin, type LoginFailReason } from './login-audit';
 import { loginSchema } from './validators';
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -14,16 +15,33 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         email: { label: '邮箱', type: 'email' },
         password: { label: '密码', type: 'password' },
       },
-      async authorize(raw) {
+      async authorize(raw, request) {
+        const headers = request?.headers;
+        const ip = headers ? clientIpOf(headers) : null;
+        const userAgent = headers?.get('user-agent') ?? null;
+        const audit = (email: string, success: boolean, reason?: LoginFailReason) =>
+          recordLogin({ email, success, reason, ip, userAgent });
+
         const parsed = loginSchema.safeParse(raw);
-        if (!parsed.success) return null;
+        if (!parsed.success) {
+          await audit(typeof raw?.email === 'string' ? raw.email : '', false, 'INVALID_INPUT');
+          return null;
+        }
 
         const email = parsed.data.email.toLowerCase();
         const user = await prisma.adminUser.findUnique({ where: { email } });
-        if (!user) return null;
+        if (!user) {
+          await audit(email, false, 'USER_NOT_FOUND');
+          return null;
+        }
 
         const valid = await bcrypt.compare(parsed.data.password, user.passwordHash);
-        if (!valid) return null;
+        if (!valid) {
+          await audit(email, false, 'BAD_PASSWORD');
+          return null;
+        }
+
+        await audit(email, true);
 
         await prisma.adminUser
           .update({ where: { id: user.id }, data: { lastLoginAt: new Date() } })

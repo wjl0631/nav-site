@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db';
 import { markdownToPlainText, normalizeArticleHtml } from '@/lib/markdown-fallback';
 import { absoluteUrl, decodeParam, formatDate } from '@/lib/utils';
 import { SmartImage } from '@/components/site/smart-image';
+import { ViewTracker } from '@/components/site/view-tracker';
 import { ChevronLeft, ChevronRight, Eye } from '@/components/ui/icons';
 
 export const dynamic = 'force-dynamic';
@@ -57,10 +58,6 @@ export default async function ArticleDetailPage({
   const summary = markdownToPlainText(article.summary);
   const contentHtml = normalizeArticleHtml(article.contentHtml);
 
-  prisma.article
-    .update({ where: { id: article.id }, data: { viewCount: { increment: 1 } } })
-    .catch(() => undefined);
-
   const [prev, next] = await Promise.all([
     prisma.article.findFirst({
       where: { status: 'PUBLISHED', publishedAt: { lt: article.publishedAt ?? new Date() } },
@@ -76,6 +73,8 @@ export default async function ArticleDetailPage({
 
   return (
     <article className="mx-auto max-w-2xl px-4 py-6 sm:px-6 sm:py-8">
+      <ViewTracker articleId={article.id} />
+
       <Link
         href="/articles"
         className="inline-flex items-center gap-1 text-xs text-muted transition hover:text-ink"
@@ -98,7 +97,7 @@ export default async function ArticleDetailPage({
           <span className="text-border">/</span>
           <span className="inline-flex items-center gap-1">
             <Eye className="h-3.5 w-3.5" />
-            {article.viewCount + 1}
+            {article.viewCount}
           </span>
           {article.tags.length > 0 && (
             <>

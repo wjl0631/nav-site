@@ -38,6 +38,24 @@ model AdminUser {
   @@map("admin_users")
 }
 
+/// 后台登录审计：成功与失败都记录，失败记录用于发现暴力破解
+model LoginLog {
+  id        String   @id @default(cuid())
+  /// 提交的登录邮箱（失败时未必是有效账号，故不做外键）
+  email     String
+  success   Boolean
+  /// 失败原因：INVALID_INPUT | USER_NOT_FOUND | BAD_PASSWORD
+  reason    String?
+  /// IP 的加盐哈希（不存原始 IP，避免构成个人信息的长期留存）
+  ipHash    String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([email, createdAt])
+  @@map("login_logs")
+}
+
 /// 导航分类
 model Category {
   id          String   @id @default(cuid())
