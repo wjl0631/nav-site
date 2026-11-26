@@ -68,6 +68,28 @@ function postForm(url: string, body: FormData, onProgress?: (percentage: number)
 }
 
 /**
+ * 常见但浏览器无法直接显示/播放的格式，给出具体出路。
+ * 这些类型即便允许上传，站点上也是裂图或无法播放，所以不给「换个格式重试」之外的选项。
+ */
+const TYPE_HINTS: Record<string, string> = {
+  heic: 'HEIC 是苹果专有格式，多数浏览器无法显示。请在相册里「导出为 JPG」或「兼容性最佳」后再传',
+  heif: 'HEIF 是苹果/相机常用格式，多数浏览器无法显示。请导出为 JPG 后再传',
+  dng: 'DNG 是相机 RAW 格式，浏览器无法显示。请先导出为 JPG',
+  cr2: 'CR2 是佳能 RAW 格式，浏览器无法显示。请先导出为 JPG',
+  nef: 'NEF 是尼康 RAW 格式，浏览器无法显示。请先导出为 JPG',
+  psd: 'PSD 是 Photoshop 工程文件，浏览器无法显示。请导出为 PNG/JPG 后上传',
+  mkv: 'MKV 容器浏览器普遍不支持播放。请转成 MP4（H.264）后再传',
+  avi: 'AVI 容器浏览器普遍不支持播放。请转成 MP4（H.264）后再传',
+  wmv: 'WMV 格式浏览器不支持播放。请转成 MP4 后再传',
+  flv: 'FLV 格式浏览器不支持播放。请转成 MP4 后再传',
+};
+
+function extOf(name: string) {
+  const m = /\.([a-z0-9]+)$/i.exec(name);
+  return m ? m[1].toLowerCase() : '';
+}
+
+/**
  * 把直传失败翻译成能指导操作的话。
  *
  * 之前的写法一律断言「被跨域拦截」，但真实失败原因有好几种
@@ -79,7 +101,10 @@ function describeUploadError(error: unknown, file: File): string {
   const message = error instanceof Error ? error.message : String(error);
 
   if (/ContentTypeNotAllowed/i.test(name) || /is not allowed/i.test(message)) {
-    const type = file.type || file.name.split('.').pop() || '未知';
+    const ext = extOf(file.name);
+    const hint = TYPE_HINTS[ext];
+    if (hint) return hint;
+    const type = file.type || ext || '未知';
     return `不支持这种文件类型（${type}），可上传图片、音视频、PDF、Office 文档或 zip/rar/7z 压缩包`;
   }
   if (/FileTooLarge/i.test(name) || /too large/i.test(message)) {
