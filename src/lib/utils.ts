@@ -86,6 +86,15 @@ export function hostOf(url: string) {
   }
 }
 
+/**
+ * 判断图标字段里存的是「图片地址」还是「emoji 文本」。
+ * emoji 不可能以 http(s):// 或 data:image/ 开头，因此这个判定不存在歧义，
+ * 也就无需维护扩展名白名单（Blob、CDN 的图标地址常常没有后缀）。
+ */
+export function isImageIcon(value?: string | null) {
+  return /^(https?:\/\/|data:image\/)/i.test((value ?? '').trim());
+}
+
 export function truncate(text: string, max = 120) {
   const plain = text.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
   return plain.length > max ? `${plain.slice(0, max)}…` : plain;

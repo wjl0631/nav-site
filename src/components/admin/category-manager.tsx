@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Field, Input, Switch, Textarea } from '@/components/ui/field';
 import { Modal } from '@/components/ui/modal';
+import { CategoryGlyph } from '@/components/ui/category-glyph';
 import { ChevronDown, ChevronUp, Eye, EyeOff, Pencil, Plus, Trash } from '@/components/ui/icons';
 import { cn } from '@/lib/utils';
 import { Badge } from './badge';
@@ -36,10 +37,13 @@ export function CategoryManager({ categories }: { categories: CategoryRow[] }) {
   const [pending, startTransition] = React.useTransition();
   const [error, setError] = React.useState('');
   const [visible, setVisible] = React.useState(true);
+  /** 图标字段受控，用于输入时实时预览 emoji 与 SVG 的最终效果 */
+  const [iconValue, setIconValue] = React.useState('');
 
   function openNew() {
     setEditing(null);
     setVisible(true);
+    setIconValue('');
     setError('');
     setOpen(true);
   }
@@ -47,6 +51,7 @@ export function CategoryManager({ categories }: { categories: CategoryRow[] }) {
   function openEdit(row: CategoryRow) {
     setEditing(row);
     setVisible(row.isVisible);
+    setIconValue(row.icon ?? '');
     setError('');
     setOpen(true);
   }
@@ -107,8 +112,12 @@ export function CategoryManager({ categories }: { categories: CategoryRow[] }) {
                 className="flex flex-wrap items-center gap-2.5 px-3.5 py-2.5 transition hover:bg-surface-2/40 sm:grid sm:grid-cols-[1fr_80px_76px_190px]"
               >
                 <div className="flex min-w-0 flex-1 items-center gap-3">
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-border bg-surface-2 text-[15px]">
-                    {row.icon || row.name.slice(0, 1)}
+                  <span className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-lg border border-border bg-surface-2 text-[15px]">
+                    <CategoryGlyph
+                      icon={row.icon}
+                      name={row.name}
+                      imgClassName="h-full w-full object-contain p-[3px]"
+                    />
                   </span>
                   <div className="min-w-0">
                     <p className="flex items-center gap-1.5 truncate text-[13px] font-medium text-ink">
@@ -203,8 +212,27 @@ export function CategoryManager({ categories }: { categories: CategoryRow[] }) {
             <Field label="名称" htmlFor="name" required>
               <Input id="name" name="name" defaultValue={editing?.name} required maxLength={40} placeholder="开发工具" />
             </Field>
-            <Field label="图标" htmlFor="icon" hint="可填 emoji，如 🛠">
-              <Input id="icon" name="icon" defaultValue={editing?.icon ?? ''} maxLength={8} placeholder="🛠" />
+            <Field label="图标" htmlFor="icon" hint="填 emoji（🛠），或图片地址（支持 .svg / .png）">
+              <div className="relative">
+                {iconValue.trim() && (
+                  <span className="pointer-events-none absolute left-2 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center overflow-hidden text-[13px]">
+                    <CategoryGlyph
+                      icon={iconValue}
+                      name=" "
+                      imgClassName="h-full w-full object-contain"
+                    />
+                  </span>
+                )}
+                <Input
+                  id="icon"
+                  name="icon"
+                  value={iconValue}
+                  onChange={(event) => setIconValue(event.target.value)}
+                  maxLength={300}
+                  placeholder="🛠 或 https://…/icon.svg"
+                  className="pl-9"
+                />
+              </div>
             </Field>
           </div>
 
