@@ -28,6 +28,17 @@ export function safeName(name: string) {
  */
 export const SERVER_UPLOAD_LIMIT = 4 * 1024 * 1024;
 
+/**
+ * Blob 是否可用。
+ *
+ * 老式存储会给 BLOB_READ_WRITE_TOKEN；新式「连接存储」默认走 OIDC，
+ * 只注入 BLOB_STORE_ID（+ BLOB_WEBHOOK_PUBLIC_KEY），SDK 会自动取短期令牌。
+ * 两种都要认，否则换了存储之后会被误判成「未配置」。
+ */
+export function blobConfigured() {
+  return Boolean(process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID);
+}
+
 export const ALLOWED_CONTENT_TYPES = [
   'image/jpeg',
   'image/png',

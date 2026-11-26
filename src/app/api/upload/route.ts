@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { auth } from '@/lib/auth';
-import { ALLOWED_CONTENT_TYPES } from '@/lib/media-meta';
+import { ALLOWED_CONTENT_TYPES, blobConfigured } from '@/lib/media-meta';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -11,7 +11,7 @@ const MAX_SIZE = 100 * 1024 * 1024; // 100MB
 // 白名单与上传中转路由共用一份，见 src/lib/media-meta.ts
 
 function blobEnabled() {
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+  return blobConfigured();
 }
 
 /** 前端据此决定走 Blob 直传，还是回退到本地 public/uploads 落盘 */
@@ -36,7 +36,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json(
       {
         error:
-          '未配置 BLOB_READ_WRITE_TOKEN（线上必需）。本地开发留空即可，系统会自动回退到 public/uploads。',
+          '未配置 Blob 存储（线上必需）。请在 Vercel 项目 Storage 中连接一个 Blob Store；本地开发留空即可，系统会自动回退到 public/uploads。',
       },
       { status: 409 },
     );

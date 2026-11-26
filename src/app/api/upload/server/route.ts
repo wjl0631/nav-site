@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth';
 import {
   ALLOWED_CONTENT_TYPES,
   SERVER_UPLOAD_LIMIT,
+  blobConfigured,
   kindOf,
   safeName,
 } from '@/lib/media-meta';
@@ -28,8 +29,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: '未登录，无法上传' }, { status: 401 });
   }
 
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    return NextResponse.json({ error: '未配置 BLOB_READ_WRITE_TOKEN' }, { status: 409 });
+  if (!blobConfigured()) {
+    return NextResponse.json({ error: '未配置 Blob 存储（缺少 BLOB_READ_WRITE_TOKEN 或 BLOB_STORE_ID）' }, { status: 409 });
   }
 
   const declared = Number(request.headers.get('content-length') ?? '0');
@@ -68,6 +69,19 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ url: blob.url, type, filename: file.name, size: file.size });
   } catch (error) {
     const message = error instanceof Error ? error.message : '上传失败';
+
+    // 存储创建时选了「私有」这一项，创建后无法更改访问模式，
+    // 原文案是英文且不带处置办法，这里直接告诉用户该怎么做
+    if (/private store/i.test(message)) {
+      return NextResponse.json(
+        {
+          error:
+            'Blob 存储被配置为「私有（private）」，无法公开访问图片。请在 Vercel 项目的 Storage 里新建一个 Access 为 Public 的 Blob Store 并连接本项目，然后重新部署（访问模式创建后不可更改）。',
+        },
+        { status: 409 },
+      );
+    }
+
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }
