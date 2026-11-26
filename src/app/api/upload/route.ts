@@ -1,54 +1,14 @@
 import { NextResponse } from 'next/server';
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { auth } from '@/lib/auth';
+import { ALLOWED_CONTENT_TYPES } from '@/lib/media-meta';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 const MAX_SIZE = 100 * 1024 * 1024; // 100MB
 
-const ALLOWED_CONTENT_TYPES = [
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'image/gif',
-  'image/svg+xml',
-  'video/mp4',
-  'video/webm',
-  'video/quicktime',
-  'video/ogg',
-  'audio/mpeg',
-  'audio/mp3',
-  'audio/wav',
-  'audio/ogg',
-  'audio/mp4',
-  'audio/aac',
-  'audio/webm',
-  'audio/x-m4a',
-  'audio/flac',
-  'audio/x-flac',
-  'audio/opus',
-  'audio/aiff',
-  'audio/x-aiff',
-  // 通用附件：只放行会在浏览器里当文件下载的类型，避免 svg/html 之类可执行内容
-  'application/pdf',
-  'application/zip',
-  'application/x-zip-compressed',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'application/vnd.ms-powerpoint',
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  'text/plain',
-  'text/markdown',
-  'text/csv',
-  'application/json',
-  'application/epub+zip',
-  'application/x-rar-compressed',
-  'application/vnd.rar',
-  'application/x-7z-compressed',
-];
+// 白名单与上传中转路由共用一份，见 src/lib/media-meta.ts
 
 function blobEnabled() {
   return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
