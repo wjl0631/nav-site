@@ -1,7 +1,8 @@
 'use server';
 
-import { AuthError } from 'next-auth';
+import { AuthError, CredentialsSignin } from 'next-auth';
 import { signIn, signOut } from '@/lib/auth';
+import { RATE_WINDOW_MINUTES } from '@/lib/login-audit';
 import type { ActionResult } from '@/lib/result';
 
 export async function loginAction(formData: FormData): Promise<ActionResult> {
@@ -13,6 +14,12 @@ export async function loginAction(formData: FormData): Promise<ActionResult> {
     });
     return { ok: true };
   } catch (error) {
+    if (error instanceof CredentialsSignin && error.code === 'rate_limited') {
+      return {
+        ok: false,
+        error: `登录尝试过于频繁，请 ${RATE_WINDOW_MINUTES} 分钟后再试`,
+      };
+    }
     if (error instanceof AuthError) {
       return { ok: false, error: '邮箱或密码不正确，请重试' };
     }

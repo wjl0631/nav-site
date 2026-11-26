@@ -1,10 +1,21 @@
-import NextAuth from 'next-auth';
+import NextAuth, { CredentialsSignin } from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import { authConfig } from './auth.config';
 import { prisma } from './db';
-import { clientIpOf, recordLogin, type LoginFailReason } from './login-audit';
+import {
+  clientIpOf,
+  hashIp,
+  isRateLimited,
+  recordLogin,
+  type LoginFailReason,
+} from './login-audit';
 import { loginSchema } from './validators';
+
+/** 触发限流时抛出，loginAction 据此给出区别于「密码错误」的提示 */
+class LoginRateLimited extends CredentialsSignin {
+  code = 'rate_limited';
+}
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -19,12 +30,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const headers = request?.headers;
         const ip = headers ? clientIpOf(headers) : null;
         const userAgent = headers?.get('user-agent') ?? null;
+        const ipHash = hashIp(ip);
         const audit = (email: string, success: boolean, reason?: LoginFailReason) =>
           recordLogin({ email, success, reason, ip, userAgent });
 
+        // 先取原始邮箱做限流判断，放在格式校验之前：
+        // 无效输入同样是攻击信号，不能因为它没通过校验就绕过计数。
+        const submitted = typeof raw?.email === 'string' ? raw.email.trim().toLowerCase() : '';
+
+        const rate = await isRateLimited(submitted, ipHash);
+        if (rate.limited) {
+          await audit(submitted, false, 'RATE_LIMITED');
+          throw new LoginRateLimited();
+        }
+
         const parsed = loginSchema.safeParse(raw);
         if (!parsed.success) {
-          await audit(typeof raw?.email === 'string' ? raw.email : '', false, 'INVALID_INPUT');
+          await audit(submitted, false, 'INVALID_INPUT');
           return null;
         }
 

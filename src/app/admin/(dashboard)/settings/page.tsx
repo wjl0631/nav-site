@@ -11,6 +11,7 @@ const FAIL_LABELS: Record<string, string> = {
   INVALID_INPUT: '输入无效',
   USER_NOT_FOUND: '账号不存在',
   BAD_PASSWORD: '密码错误',
+  RATE_LIMITED: '已限流',
 };
 
 const RECENT_LIMIT = 10;

@@ -53,6 +53,7 @@ model LoginLog {
 
   @@index([createdAt])
   @@index([email, createdAt])
+  @@index([ipHash, createdAt])
   @@map("login_logs")
 }
 
