@@ -50,7 +50,12 @@ const NO_STORAGE_MESSAGE =
  * fetch 没有上传进度事件，而这条路是我们自己的域名、不受跨域限制，
  * 用 XHR 既能上报进度又最稳。
  */
-function postForm(url: string, body: FormData, onProgress?: (percentage: number) => void) {
+function postForm(
+  url: string,
+  body: FormData,
+  onProgress?: (percentage: number) => void,
+  signal?: AbortSignal,
+) {
   return new Promise<{ status: number; data: { url?: string; error?: string } | null }>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', url);
@@ -70,6 +75,18 @@ function postForm(url: string, body: FormData, onProgress?: (percentage: number)
     };
     xhr.onerror = () => reject(new Error('网络中断，上传失败'));
     xhr.ontimeout = () => reject(new Error('上传超时，请重试'));
+    xhr.onabort = () => {
+      const error = new Error('已取消上传');
+      error.name = 'AbortError';
+      reject(error);
+    };
+    if (signal) {
+      if (signal.aborted) {
+        xhr.abort();
+        return;
+      }
+      signal.addEventListener('abort', () => xhr.abort(), { once: true });
+    }
     xhr.send(body);
   });
 }
@@ -107,6 +124,10 @@ function describeUploadError(error: unknown, file: File): string {
   const name = error instanceof Error ? error.name : '';
   const message = error instanceof Error ? error.message : String(error);
 
+  if (/Abort/i.test(name) || /abort/i.test(message)) {
+    return '上传已取消';
+  }
+
   if (/ContentTypeNotAllowed/i.test(name) || /is not allowed/i.test(message)) {
     const ext = extOf(file.name);
     const hint = TYPE_HINTS[ext];
@@ -131,6 +152,7 @@ function describeUploadError(error: unknown, file: File): string {
 export async function uploadAndRegister(
   file: File,
   onProgress?: (percentage: number) => void,
+  signal?: AbortSignal,
 ): Promise<UploadedMedia> {
   const mode = await storageMode();
 
@@ -168,8 +190,11 @@ export async function uploadAndRegister(
       const body = new FormData();
       body.append('file', target);
 
-      const res = await postForm('/api/upload/server', body, (p) =>
-        onProgress?.(Math.min(99, 10 + Math.round(p * 0.89))),
+      const res = await postForm(
+        '/api/upload/server',
+        body,
+        (p) => onProgress?.(Math.min(99, 10 + Math.round(p * 0.89))),
+        signal,
       );
 
       if (res.status !== 200 || !res.data?.url) {
@@ -198,6 +223,7 @@ export async function uploadAndRegister(
         // 存储端按 application/octet-stream 处理，而它不在白名单里 → 403。
         // （图片、zip 等靠扩展名能被推断出来，exe 不行，所以只有它失败）
         contentType: target.type || undefined,
+        abortSignal: signal,
         onUploadProgress: (event) => {
           onProgress?.(Math.min(99, 10 + Math.round(event.percentage * 0.89)));
         },
@@ -220,8 +246,11 @@ export async function uploadAndRegister(
 
   const body = new FormData();
   body.append('file', target);
-  const res = await postForm('/api/upload/local', body, (p) =>
-    onProgress?.(Math.min(99, 10 + Math.round(p * 0.89))),
+  const res = await postForm(
+    '/api/upload/local',
+    body,
+    (p) => onProgress?.(Math.min(99, 10 + Math.round(p * 0.89))),
+    signal,
   );
   if (res.status !== 200 || !res.data?.url) {
     throw new Error(res.data?.error || '上传失败');

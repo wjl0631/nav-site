@@ -57,6 +57,39 @@ export function MediaManager({ media, usage }: { media: MediaRow[]; usage: Media
   const [dragging, setDragging] = React.useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
+  /**
+   * 大文件走浏览器直传时，进度事件可能几十秒才来一次（SDK 按 64KB 累计，
+   * 但浏览器会把请求体先缓冲，中途不给回调），界面就会长时间钉在 10%。
+   * 这里记录「最后一次收到进度的时刻」，停滞时改用不计数的文案 + 计时，
+   * 至少让人知道它还在跑，而不是显示一个假的百分比。
+   */
+  const lastTick = React.useRef(0);
+  const startedAt = React.useRef(0);
+  const abortRef = React.useRef<AbortController | null>(null);
+  const [, forceTick] = React.useState(0);
+
+  React.useEffect(() => {
+    if (!uploading) return;
+    const timer = window.setInterval(() => forceTick((n) => n + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [uploading]);
+
+  const report = React.useCallback((value: number) => {
+    lastTick.current = Date.now();
+    setProgress(value);
+  }, []);
+
+  const idleSeconds = uploading && lastTick.current ? Math.round((Date.now() - lastTick.current) / 1000) : 0;
+  const elapsedSeconds = uploading && startedAt.current ? Math.round((Date.now() - startedAt.current) / 1000) : 0;
+  const stalled = uploading && progress >= 10 && idleSeconds >= 3;
+  const uploadLabel = !uploading
+    ? '上传文件'
+    : progress < 10
+      ? '处理中…'
+      : stalled
+        ? `上传中… ${elapsedSeconds}s`
+        : `上传中 ${progress}%`;
+
   const list = filter === 'ALL' ? media : media.filter((m) => m.type === filter);
 
   const ratio = usage.quota > 0 ? Math.min(1, usage.used / usage.quota) : 0;
@@ -65,13 +98,20 @@ export function MediaManager({ media, usage }: { media: MediaRow[]; usage: Media
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
+    const controller = new AbortController();
+    abortRef.current = controller;
     setUploading(true);
     setProgress(0);
+    startedAt.current = Date.now();
+    lastTick.current = Date.now();
     try {
       let compressedCount = 0;
       let savedBytes = 0;
       for (const file of Array.from(files)) {
-        const result = await uploadAndRegister(file, setProgress);
+        startedAt.current = Date.now();
+        lastTick.current = Date.now();
+        setProgress(0);
+        const result = await uploadAndRegister(file, report, controller.signal);
         if (result.compressed) {
           compressedCount += 1;
           savedBytes += result.originalSize - result.size;
@@ -84,8 +124,14 @@ export function MediaManager({ media, usage }: { media: MediaRow[]; usage: Media
       );
       router.refresh();
     } catch (error) {
-      push(error instanceof Error ? error.message : '上传失败，请检查 BLOB_READ_WRITE_TOKEN', 'error');
+      // 主动取消不算故障，不弹红色错误
+      if (controller.signal.aborted) {
+        push('已取消上传');
+      } else {
+        push(error instanceof Error ? error.message : '上传失败，请检查 BLOB_READ_WRITE_TOKEN', 'error');
+      }
     } finally {
+      abortRef.current = null;
       setUploading(false);
       setProgress(0);
       if (inputRef.current) inputRef.current.value = '';
@@ -108,14 +154,25 @@ export function MediaManager({ media, usage }: { media: MediaRow[]; usage: Media
           <h2 className="text-[16px] font-semibold text-ink">媒体中心</h2>
           <p className="mt-0.5 text-[11.5px] text-muted">共 {media.length} 个文件，支持图片 / 视频 / 音频</p>
         </div>
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          disabled={uploading}
-          className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-brand px-4 text-sm font-medium text-brand-ink transition hover:opacity-90 disabled:opacity-60"
-        >
-          {uploading ? (progress < 10 ? '处理中…' : `上传中 ${progress}%`) : '上传文件'}
-        </button>
+        <div className="flex items-center gap-2">
+          {uploading && (
+            <button
+              type="button"
+              onClick={() => abortRef.current?.abort()}
+              className="h-10 rounded-xl border border-border px-3 text-[12.5px] text-muted transition hover:border-brand/40 hover:text-ink"
+            >
+              取消
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            disabled={uploading}
+            className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-brand px-4 text-sm font-medium text-brand-ink transition hover:opacity-90 disabled:opacity-60"
+          >
+            {uploadLabel}
+          </button>
+        </div>
         <input
           ref={inputRef}
           type="file"
