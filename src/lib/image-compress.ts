@@ -21,6 +21,12 @@ const SKIP_BELOW = 300 * 1024;
 
 const SKIP_TYPES = new Set(['image/gif', 'image/svg+xml', 'image/avif']);
 
+/** 解码与编码各自的上限，超时即放弃压缩、按原图上传 */
+const DECODE_TIMEOUT = 15_000;
+const ENCODE_TIMEOUT = 15_000;
+/** 像素上限：超过则不解码后重绘，避免大图把标签页内存打爆 */
+const MAX_PIXELS = 50_000_000;
+
 export type CompressResult = {
   /** 实际要上传的文件（未压缩时即原文件） */
   file: File;
@@ -28,6 +34,21 @@ export type CompressResult = {
   originalSize: number;
   compressed: boolean;
 };
+
+/**
+ * 给异步步骤加个上限。
+ *
+ * `canvas.toBlob` 的回调**不保证会被调用**：画布过大或内存不足时它会静默失败，
+ * 表现为 Promise 永远 pending，上传按钮就卡在「0%」不动了。
+ * 同理，损坏的图片偶尔既不触发 onload 也不触发 onerror。
+ * 压缩只是优化，这两处都必须有兜底，绝不能把上传挂在半空。
+ */
+function withTimeout<T>(task: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([
+    task,
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
+  ]);
+}
 
 function loadImage(src: string) {
   return new Promise<HTMLImageElement>((resolve, reject) => {
@@ -52,10 +73,14 @@ export async function compressImage(file: File): Promise<CompressResult> {
 
   const objectUrl = URL.createObjectURL(file);
   try {
-    const img = await loadImage(objectUrl);
+    const img = await withTimeout(loadImage(objectUrl), DECODE_TIMEOUT, null);
+    if (!img) return untouched;
+
     const width = img.naturalWidth;
     const height = img.naturalHeight;
     if (!width || !height) return untouched;
+    // 超大图重绘极易触发 toBlob 静默失败，直接按原图上传更稳
+    if (width * height > MAX_PIXELS) return untouched;
 
     const scale = Math.min(1, MAX_EDGE / Math.max(width, height));
     const targetWidth = Math.max(1, Math.round(width * scale));
@@ -72,9 +97,13 @@ export async function compressImage(file: File): Promise<CompressResult> {
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
 
-    const blob = await new Promise<Blob | null>((resolve) => {
-      canvas.toBlob(resolve, 'image/webp', QUALITY);
-    });
+    const blob = await withTimeout(
+      new Promise<Blob | null>((resolve) => {
+        canvas.toBlob(resolve, 'image/webp', QUALITY);
+      }),
+      ENCODE_TIMEOUT,
+      null,
+    );
 
     // 压完反而更大（小图、已优化过的图很常见），保留原文件
     if (!blob || blob.size >= originalSize) return untouched;

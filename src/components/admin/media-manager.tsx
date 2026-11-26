@@ -114,7 +114,7 @@ export function MediaManager({ media, usage }: { media: MediaRow[]; usage: Media
           disabled={uploading}
           className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-brand px-4 text-sm font-medium text-brand-ink transition hover:opacity-90 disabled:opacity-60"
         >
-          {uploading ? `上传中 ${progress}%` : '上传文件'}
+          {uploading ? (progress < 10 ? '处理中…' : `上传中 ${progress}%`) : '上传文件'}
         </button>
         <input
           ref={inputRef}

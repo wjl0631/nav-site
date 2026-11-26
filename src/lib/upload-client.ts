@@ -63,9 +63,14 @@ export async function uploadAndRegister(
     throw new Error(NO_STORAGE_MESSAGE);
   }
 
+  // 压缩阶段耗时且无法上报细粒度进度，先给个非零值：
+  // 否则一张大图可能让进度条停在字面上的 0%，看起来像卡死了
+  onProgress?.(2);
+
   // 图片先压缩再上传：直接决定 Blob 存储与流量的消耗速度
   const { file: target, originalSize, compressed } = await compressImage(file);
   const type = kindOf(target);
+  onProgress?.(10);
 
   const done = (url: string, savedType: MediaKind): UploadedMedia => ({
     url,
@@ -81,8 +86,12 @@ export async function uploadAndRegister(
     const blob = await upload(pathname, target, {
       access: 'public',
       handleUploadUrl: '/api/upload',
-      onUploadProgress: (event) => onProgress?.(Math.round(event.percentage)),
+      // 把传输进度映射到 10%~99%，让整条进度条连续推进
+      onUploadProgress: (event) => {
+        onProgress?.(Math.min(99, 10 + Math.round(event.percentage * 0.89)));
+      },
     });
+    onProgress?.(100);
 
     await saveMediaAction({
       url: blob.url,
