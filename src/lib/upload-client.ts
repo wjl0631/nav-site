@@ -194,6 +194,10 @@ export async function uploadAndRegister(
       const blob = await upload(pathname, target, {
         access: 'public',
         handleUploadUrl: '/api/upload',
+        // 必须显式传：不传时 SDK 不会发 x-content-type 头，
+        // 存储端按 application/octet-stream 处理，而它不在白名单里 → 403。
+        // （图片、zip 等靠扩展名能被推断出来，exe 不行，所以只有它失败）
+        contentType: target.type || undefined,
         onUploadProgress: (event) => {
           onProgress?.(Math.min(99, 10 + Math.round(event.percentage * 0.89)));
         },
