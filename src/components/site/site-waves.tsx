@@ -9,6 +9,10 @@ import { cn } from '@/lib/utils';
  * 每条 path 首尾同高，配合整条带子平移一份宽度即可无缝循环。
  * fill 铺水面、stroke 勾一道水线 —— 只有填充时小屏上会糊成一片雾，描边让波峰立住。
  * 不透明度用 CSS 变量交给 path 的 fill-opacity / stroke-opacity，暗色下再抬一档。
+ *
+ * 有意不响应 prefers-reduced-motion：波形填充不透明度只有 3.8%–6%、
+ * 单层横移周期 40–76 秒，几乎不构成眩晕诱因，产品上决定在所有设备保持动态。
+ * 若将来要恢复无障碍降级，在这里加回 motion-reduce:animate-none。
  */
 const WAVES = [
   {
@@ -39,7 +43,7 @@ export function SiteWaves() {
         <div
           key={wave.d}
           className={cn(
-            'absolute inset-x-0 bottom-0 w-[200%] motion-reduce:animate-none',
+            'absolute inset-x-0 bottom-0 w-[200%]',
             wave.className,
           )}
         >
