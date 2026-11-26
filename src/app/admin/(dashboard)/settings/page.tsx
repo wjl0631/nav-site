@@ -51,20 +51,6 @@ export default async function AdminSettingsPage() {
         <p className="mt-0.5 mb-4 text-[11px] text-muted">修改后请使用新密码重新登录其他设备</p>
         <PasswordForm />
       </section>
-
-      <section className="rounded-xl border border-border bg-surface p-3.5 text-[11.5px] leading-relaxed text-muted shadow-[var(--shadow-card)]">
-        <h3 className="text-[13.5px] font-semibold text-ink">部署提示</h3>
-        <ul className="mt-2 list-disc space-y-1 pl-4">
-          <li>
-            媒体上传依赖 Vercel Blob，请在项目 Storage 中创建 Blob Store 并确认环境变量{' '}
-            <code className="rounded bg-surface-2 px-1">BLOB_READ_WRITE_TOKEN</code> 已注入。
-          </li>
-          <li>
-            数据库结构变更后执行 <code className="rounded bg-surface-2 px-1">npm run db:push</code>（本地）或重新部署。
-          </li>
-          <li>生产环境请务必更换 AUTH_SECRET 与初始管理员密码。</li>
-        </ul>
-      </section>
     </div>
   );
 }
