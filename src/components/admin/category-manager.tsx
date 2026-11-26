@@ -112,7 +112,7 @@ export function CategoryManager({ categories }: { categories: CategoryRow[] }) {
                 className="flex flex-wrap items-center gap-2.5 px-3.5 py-2.5 transition hover:bg-surface-2/40 sm:grid sm:grid-cols-[1fr_80px_76px_190px]"
               >
                 <div className="flex min-w-0 flex-1 items-center gap-3">
-                  <span className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-lg border border-border bg-surface-2 text-[15px]">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-lg border border-border bg-surface-2 text-[15px] dark:border-white/10 dark:bg-white/90 dark:text-[#3d4552]">
                     <CategoryGlyph
                       icon={row.icon}
                       name={row.name}
@@ -215,11 +215,11 @@ export function CategoryManager({ categories }: { categories: CategoryRow[] }) {
             <Field label="图标" htmlFor="icon">
               <div className="relative">
                 {iconValue.trim() && (
-                  <span className="pointer-events-none absolute left-2 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center overflow-hidden text-[13px]">
+                  <span className="pointer-events-none absolute left-2 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center overflow-hidden rounded-md text-[13px] dark:bg-white/90 dark:text-[#3d4552]">
                     <CategoryGlyph
                       icon={iconValue}
                       name=" "
-                      imgClassName="h-full w-full object-contain"
+                      imgClassName="h-full w-full object-contain p-[2px]"
                     />
                   </span>
                 )}

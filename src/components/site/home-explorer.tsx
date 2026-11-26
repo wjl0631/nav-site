@@ -100,7 +100,9 @@ export function HomeExplorer({
               className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1 text-[12px] text-ink-soft transition hover:border-brand/40 hover:text-brand"
             >
               {c.icon ? (
-                <CategoryGlyph icon={c.icon} name={c.name} imgClassName="h-3.5 w-3.5 object-contain" />
+                <span className="grid h-4 w-4 shrink-0 place-items-center overflow-hidden rounded-[3px] dark:bg-white/90">
+                  <CategoryGlyph icon={c.icon} name={c.name} imgClassName="h-full w-full object-contain" />
+                </span>
               ) : null}
               {c.name}
             </a>
@@ -113,7 +115,9 @@ export function HomeExplorer({
           {categories.map((category) => (
             <section key={category.id} id={`cat-${category.slug}`} className="scroll-mt-20">
               <div className="mb-2.5 flex items-start gap-2.5">
-                <span className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-lg border border-border bg-surface text-[15px] shadow-sm">
+                {/* 暗色下容器转为浅底：图标多为 currentColor 单色黑，
+                    不换底会直接糊进 #12161d 的背景里（与 SiteIcon 同一策略） */}
+                <span className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-lg border border-border bg-surface text-[15px] shadow-sm dark:border-white/10 dark:bg-white/90 dark:text-[#3d4552]">
                   <CategoryGlyph
                     icon={category.icon}
                     name={category.name}
