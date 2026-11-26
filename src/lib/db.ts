@@ -8,17 +8,30 @@ function createClient() {
   });
 
   // Neon / Serverless Postgres 会 scale-to-zero，唤醒期间偶发 P1001（Can't reach database server）。
-  // 这里对连接类错误做一次短重试，避免把冷启动直接暴露成 500。
+  // 这里对连接类错误做退避重试，避免把冷启动直接暴露成 500。
+  //
+  // 为什么是两次而不是一次：实测 Neon 从挂起到可连接常在 1~3 秒之间，
+  // 单次 600ms 的重试经常在实例还没唤醒时就已经放弃，表现就是「首屏报错、刷新就好」。
+  // 累计等待 1.6 秒仍失败，基本可以判定不是冷启动，直接抛出交给错误边界。
   return client.$extends({
     query: {
       async $allOperations({ args, query }) {
-        try {
-          return await query(args);
-        } catch (error) {
-          if (!isUnreachable(error)) throw error;
-          await new Promise((resolve) => setTimeout(resolve, 600));
-          return query(args);
+        const delays = [400, 1200];
+        let lastError: unknown;
+
+        for (let attempt = 0; attempt <= delays.length; attempt++) {
+          try {
+            return await query(args);
+          } catch (error) {
+            if (!isUnreachable(error)) throw error;
+            lastError = error;
+            const delay = delays[attempt];
+            if (delay === undefined) break;
+            await new Promise((resolve) => setTimeout(resolve, delay));
+          }
         }
+
+        throw lastError;
       },
     },
   });
