@@ -212,7 +212,7 @@ export function CategoryManager({ categories }: { categories: CategoryRow[] }) {
             <Field label="名称" htmlFor="name" required>
               <Input id="name" name="name" defaultValue={editing?.name} required maxLength={40} placeholder="开发工具" />
             </Field>
-            <Field label="图标" htmlFor="icon" hint="填 emoji（🛠），或图片地址（支持 .svg / .png）">
+            <Field label="图标" htmlFor="icon">
               <div className="relative">
                 {iconValue.trim() && (
                   <span className="pointer-events-none absolute left-2 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center overflow-hidden text-[13px]">

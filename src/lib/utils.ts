@@ -95,6 +95,30 @@ export function isImageIcon(value?: string | null) {
   return /^(https?:\/\/|data:image\/)/i.test((value ?? '').trim());
 }
 
+/** Iconify 系的图标 API 主机名 */
+const ICONIFY_HOST = /(^|\.)(iconify\.design|simplesvg\.com|unisvg\.com)$/i;
+
+/**
+ * 修正 Iconify 的地址写法。
+ * Iconify 组件里引用图标写作「前缀:名称」，但它的 HTTP 接口要求「前缀/名称」，
+ * 冒号写法会返回 404 且响应体为空，页面表现为破图。这里静默纠正成斜杠形式。
+ */
+export function normalizeIconSrc(value?: string | null) {
+  const raw = (value ?? '').trim();
+  if (!/^https?:\/\//i.test(raw)) return raw;
+
+  try {
+    const url = new URL(raw);
+    if (ICONIFY_HOST.test(url.hostname) && url.pathname.includes(':')) {
+      url.pathname = url.pathname.replace(':', '/');
+      return url.toString();
+    }
+  } catch {
+    return raw;
+  }
+  return raw;
+}
+
 export function truncate(text: string, max = 120) {
   const plain = text.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
   return plain.length > max ? `${plain.slice(0, max)}…` : plain;
