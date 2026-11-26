@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { saveArticleAction } from '@/actions/article';
 import { uploadAndRegister } from '@/lib/upload-client';
-import { cn } from '@/lib/utils';
+import { cn, normalizeCoverUrl } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Field, Input, Switch, Textarea } from '@/components/ui/field';
 import { ChevronLeft, ImageIcon, Trash, X } from '@/components/ui/icons';
@@ -42,9 +42,19 @@ export function ArticleForm({ initial }: { initial: ArticleDraft }) {
   const [coverUrl, setCoverUrl] = React.useState(initial.coverUrl);
   const [featured, setFeatured] = React.useState(initial.isFeatured);
   const [coverUploading, setCoverUploading] = React.useState(false);
+  // 链接输入用独立的草稿值：边打字边写 coverUrl 会让预览反复发请求
+  const [coverLink, setCoverLink] = React.useState(initial.coverUrl);
+  const [coverLinkError, setCoverLinkError] = React.useState('');
+  const [coverBroken, setCoverBroken] = React.useState(false);
   const [pending, startTransition] = React.useTransition();
   const [error, setError] = React.useState('');
   const coverInput = React.useRef<HTMLInputElement>(null);
+
+  // 上传、清除、应用链接都会改动 coverUrl，这里同步草稿值与破图状态
+  React.useEffect(() => {
+    setCoverLink(coverUrl);
+    setCoverBroken(false);
+  }, [coverUrl]);
 
   function onEditorChange(payload: EditorPayload) {
     contentRef.current = { json: payload.json, html: payload.html };
@@ -64,6 +74,18 @@ export function ArticleForm({ initial }: { initial: ArticleDraft }) {
     }
   }
 
+  /** 把输入框里的链接规范化后写入 coverUrl */
+  function applyCoverLink() {
+    const raw = coverLink.trim();
+    const normalized = normalizeCoverUrl(raw);
+    if (normalized === null) {
+      setCoverLinkError('无法识别这个地址，请填写 https:// 开头的图片链接');
+      return;
+    }
+    setCoverLinkError('');
+    if (normalized !== coverUrl) setCoverUrl(normalized);
+  }
+
   function save(status: 'DRAFT' | 'PUBLISHED') {
     const form = formRef.current;
     if (!form) return;
@@ -78,7 +100,17 @@ export function ArticleForm({ initial }: { initial: ArticleDraft }) {
     if (initial.id) formData.set('id', initial.id);
     formData.set('status', status);
     formData.set('isFeatured', String(featured));
-    formData.set('coverUrl', coverUrl);
+    // 以输入框实际值为准：用户填完链接直接点保存时，blur 触发的 setState
+    // 未必赶在这次 click 之前生效，只读 state 会把刚填的链接丢掉
+    const coverField = form.elements.namedItem('coverLink') as HTMLInputElement | null;
+    const finalCover = normalizeCoverUrl(coverField?.value ?? '');
+    if (finalCover === null) {
+      setCoverLinkError('无法识别这个地址，请填写 https:// 开头的图片链接');
+      setError('封面链接格式不正确');
+      return;
+    }
+    if (finalCover !== coverUrl) setCoverUrl(finalCover);
+    formData.set('coverUrl', finalCover);
     formData.set('contentHtml', contentRef.current.html || '');
     formData.set('contentJson', JSON.stringify(contentRef.current.json ?? EMPTY_DOC));
     setError('');
@@ -168,8 +200,15 @@ export function ArticleForm({ initial }: { initial: ArticleDraft }) {
                     src={coverUrl}
                     alt="封面预览"
                     className="h-full w-full object-cover"
-                    onError={() => setCoverUrl('')}
+                    // 外链失效时不再清空输入（那会把用户刚填的地址一起吃掉），
+                    // 改为就地提示，地址仍可编辑或手动清除
+                    onError={() => setCoverBroken(true)}
                   />
+                  {coverBroken && (
+                    <div className="absolute inset-x-0 bottom-0 bg-danger/85 px-2 py-1 text-[10.5px] leading-tight text-white">
+                      图片加载失败，可能禁止外链
+                    </div>
+                  )}
                   <button
                     type="button"
                     onClick={() => setCoverUrl('')}
@@ -213,6 +252,30 @@ export function ArticleForm({ initial }: { initial: ArticleDraft }) {
                 </Button>
               )}
             </div>
+
+            {/* 直接用图片链接，省掉上传到 Blob 的流量 */}
+            <Input
+              name="coverLink"
+              value={coverLink}
+              onChange={(e) => {
+                setCoverLink(e.target.value);
+                if (coverLinkError) setCoverLinkError('');
+              }}
+              onBlur={applyCoverLink}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  applyCoverLink();
+                }
+              }}
+              placeholder="或粘贴图片链接"
+              aria-label="封面图片链接"
+              inputMode="url"
+              autoComplete="off"
+              spellCheck={false}
+              className="mt-2 h-8 text-[11.5px]"
+            />
+            {coverLinkError && <p className="mt-1 text-[11px] text-danger">{coverLinkError}</p>}
           </section>
 
           {/* 发布设置 */}

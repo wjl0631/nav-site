@@ -3,8 +3,14 @@ const nextConfig = {
   // 项目未配置 ESLint，构建时跳过以免阻塞部署
   eslint: { ignoreDuringBuilds: true },
   images: {
-    // 媒体托管在 Vercel Blob / 任意 CDN，这里放行 https 图源
-    remotePatterns: [{ protocol: 'https', hostname: '**' }],
+    // 媒体托管在 Vercel Blob / 任意 CDN，这里放行外部图源。
+    // 同时放行 http：封面支持粘贴任意图片链接，若只允许 https，
+    // next/image 会在渲染期对 http 源直接抛错（不是降级，是整个页面进错误边界）。
+    // 注意：私网地址仍被 Next 默认拦截（除非显式开启 dangerouslyAllowLocalIP）。
+    remotePatterns: [
+      { protocol: 'https', hostname: '**' },
+      { protocol: 'http', hostname: '**' },
+    ],
   },
   // Prisma 必须外部化：它要按平台加载原生查询引擎，打包会破坏路径解析。
   // bcryptjs 是纯 CJS，外部化无副作用。

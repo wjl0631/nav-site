@@ -95,6 +95,28 @@ export function isImageIcon(value?: string | null) {
   return /^(https?:\/\/|data:image\/)/i.test((value ?? '').trim());
 }
 
+/**
+ * 规范化封面图地址。
+ *
+ * 封面走 next/image，`src` 只接受「带 scheme 的绝对地址」或「/ 开头的站内路径」，
+ * 否则渲染期会直接抛错、整页掉进错误边界。所以这里做一次宽松纠正：
+ * 裸域名补 https、协议相对地址补 scheme；实在无法识别的返回 null（由调用方提示）。
+ *
+ * 空字符串原样返回，表示「清除封面」。
+ */
+export function normalizeCoverUrl(raw?: string | null): string | null {
+  const value = (raw ?? '').trim();
+  if (!value) return '';
+  // 协议相对地址要先于「站内路径」判断：//host/a.jpg 也以 / 开头，
+  // 若被当成站内路径，next/image 会按同源去请求而 404
+  if (value.startsWith('//')) return `https:${value}`;
+  if (value.startsWith('/')) return value; // 站内路径，如 /uploads/xxx.webp
+  if (/^https?:\/\//i.test(value)) return value;
+  // 裸域名：example.com/a.jpg
+  if (/^[a-z0-9-]+(\.[a-z0-9-]+)+([/?#]|$)/i.test(value)) return `https://${value}`;
+  return null;
+}
+
 /** Iconify 系的图标 API 主机名 */
 const ICONIFY_HOST = /(^|\.)(iconify\.design|simplesvg\.com|unisvg\.com)$/i;
 
